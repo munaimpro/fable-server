@@ -26,7 +26,9 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
-
+        // Create database and collections
+        const db = client.db('fable');
+        const ebookCollection = db.collection('ebooks');
 
         const JWKS = createRemoteJWKSet(
             new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
@@ -53,6 +55,12 @@ async function run() {
                 return response.status(403).json({message:"forbidden"})
             }
         }
+
+        // Find featured ebooks for homepage
+        app.get('/featured-ebooks', async (request, response) => {
+            const result = await ebookCollection.find().limit(6).toArray();
+            response.json(result);
+        });
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
