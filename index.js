@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 dotenv.config();
-const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
+const { jwtVerify, createRemoteJWKSet } = require('jose-cjs');
 
 const mongodburi = process.env.MONGO_URI;
 
@@ -24,7 +24,7 @@ const client = new MongoClient(mongodburi, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         // Create database and collections
         const db = client.db('fable');
