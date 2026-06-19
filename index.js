@@ -241,9 +241,57 @@ async function run() {
 
         // Find all bookmarks for single user
         app.get('/bookmarks/:userId', async (request, response) => {
-            const { userId } = request.params;
-            const result = await bookmarkCollection.find({ userId }).toArray();
-            response.json(result);
+            try {
+                const { userId } = request.params;
+
+                const result = await bookmarkCollection.aggregate([
+                    {
+                        $match: {
+                            userId
+                        }
+                    },
+
+                    {
+                        $addFields: {
+                            ebookObjectId: {
+                                $toObjectId: "$ebookId"
+                            }
+                        }
+                    },
+
+                    {
+                        $lookup: {
+                            from: "ebooks",
+                            localField: "ebookObjectId",
+                            foreignField: "_id",
+                            as: "ebook"
+                        }
+                    },
+
+                    {
+                        $unwind: "$ebook"
+                    },
+
+                    {
+                        $project: {
+                            _id: 1,
+                            userId: 1,
+                            ebookId: 1,
+                            createdAt: 1,
+                            ebook: 1
+                        }
+                    }
+                ]).toArray();
+
+                response.json(result);
+
+            } catch (error) {
+                console.error(error);
+
+                response.status(500).json({
+                    message: 'Failed to fetch bookmarks'
+                });
+            }
         });
 
         // Add bookmark by a single user
