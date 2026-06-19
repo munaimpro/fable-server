@@ -62,6 +62,78 @@ async function run() {
             response.json(result);
         });
 
+        // Find top writers for homepage
+        app.get('/top-writers', async (request, response) => {
+            const result = await ebookCollection.aggregate([
+                {
+                    $match: {
+                        status: "published"
+                    }
+                },
+
+                {
+                    $group: {
+                        _id: "$writerId",
+                        totalSoldCopies: {
+                            $sum: "$totalSales"
+                        },
+                        genres: {
+                            $addToSet: "$genre"
+                        }
+                    }
+                },
+
+                {
+                    $sort: {
+                        totalSoldCopies: -1
+                    }
+                },
+
+                {
+                    $limit: 3
+                },
+
+                {
+                    $addFields: {
+                        writerObjectId: {
+                            $toObjectId: "$_id"
+                        }
+                    }
+                },
+
+                {
+                    $lookup: {
+                        from: "user",
+                        localField: "writerObjectId",
+                        foreignField: "_id",
+                        as: "writer"
+                    }
+                },
+
+                {
+                    $unwind: "$writer"
+                },
+
+                {
+                    $project: {
+                        _id: 0,
+                        writerId: "$writer._id",
+                        name: "$writer.name",
+                        image: "$writer.image",
+                        genres: 1,
+                        totalSoldCopies: 1
+                    }
+                }
+            ]).toArray();
+
+            response.json(result);
+        });
+
+        // app.get('/debug-writers', async (req, res) => {
+        //     const result = await ebookCollection.find().toArray();
+        //     res.send(result);
+        // });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
