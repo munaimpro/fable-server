@@ -29,6 +29,7 @@ async function run() {
         // Create database and collections
         const db = client.db('fable');
         const ebookCollection = db.collection('ebooks');
+        const bookmarkCollection = db.collection('bookmarks');
 
         const JWKS = createRemoteJWKSet(
             new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
@@ -133,6 +134,158 @@ async function run() {
         //     const result = await ebookCollection.find().toArray();
         //     res.send(result);
         // });
+
+        app.get('/ebooks', async (request, response) => {
+            try {
+                const {
+                    search = '',
+                    genre = 'All',
+                    availability = 'all',
+                    minPrice = 0,
+                    maxPrice = 999999,
+                    sortBy = 'newest',
+                    page = 1,
+                    limit = 8
+                } = request.query;
+
+                const currentPage = parseInt(page);
+                const perPage = parseInt(limit);
+
+                const query = {
+                    status: 'published'
+                };
+
+                // Search by title or writer name
+                if (search.trim()) {
+                    query.$or = [
+                        {
+                            title: {
+                                $regex: search,
+                                $options: 'i'
+                            }
+                        },
+                        {
+                            writerName: {
+                                $regex: search,
+                                $options: 'i'
+                            }
+                        }
+                    ];
+                }
+
+                // Genre Filter
+                if (genre !== 'All') {
+                    query.genre = genre;
+                }
+
+                // Availability Filter
+                if (availability !== 'all') {
+                    query.status = availability;
+                }
+
+                // Price Filter
+                query.price = {
+                    $gte: Number(minPrice),
+                    $lte: Number(maxPrice)
+                };
+
+                // Sorting
+                let sortOption = {};
+
+                switch (sortBy) {
+                    case 'price-asc':
+                        sortOption = { price: 1 };
+                        break;
+
+                    case 'price-desc':
+                        sortOption = { price: -1 };
+                        break;
+
+                    case 'newest':
+                    default:
+                        sortOption = { createdAt: -1 };
+                        break;
+                }
+
+                const total = await ebookCollection.countDocuments(query);
+
+                const ebooks = await ebookCollection
+                    .find(query)
+                    .sort(sortOption)
+                    .skip((currentPage - 1) * perPage)
+                    .limit(perPage)
+                    .toArray();
+
+                response.status(200).json({
+                    ebooks,
+                    total,
+                    totalPages: Math.ceil(total / perPage),
+                    currentPage
+                });
+
+            } catch (error) {
+                console.error(error);
+
+                response.status(500).json({
+                    message: 'Failed to fetch ebooks'
+                });
+            }
+        });
+
+        // Find single ebook
+        app.get('/ebook/:ebookId', async (request, response) => {
+            const { ebookId } = request.params;
+            const result = await ebookCollection.findOne({ _id: new ObjectId(ebookId) });
+            response.json(result);
+        });
+
+        // Find all bookmarks for single user
+        app.get('/bookmarks/:userId', async (request, response) => {
+            const { userId } = request.params;
+            const result = await bookmarkCollection.find({ userId }).toArray();
+            response.json(result);
+        });
+
+        // Add bookmark by a single user
+        app.post('/bookmarks', async (request, response) => {
+            try {
+                const { ebookId, userId } = request.body;
+
+                const existingBookmark =
+                    await bookmarkCollection.findOne({
+                        ebookId,
+                        userId
+                    });
+
+                if (existingBookmark) {
+                    await bookmarkCollection.deleteOne({
+                        _id: existingBookmark._id
+                    });
+
+                    return response.json({
+                        bookmarked: false,
+                        message: 'Bookmark removed'
+                    });
+                }
+
+                await bookmarkCollection.insertOne({
+                    ebookId,
+                    userId,
+                    createdAt: new Date()
+                });
+
+                response.json({
+                    bookmarked: true,
+                    message: 'Bookmark added'
+                });
+
+            } catch (error) {
+                console.error(error);
+                response.status(500).json({
+                    message: 'Bookmark operation failed'
+                });
+            }
+        });
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
