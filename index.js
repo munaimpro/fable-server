@@ -335,6 +335,27 @@ async function run() {
             }
         });
 
+        // Update book status by writer
+        app.put('/ebook/:ebookId', async (request, response) => {
+            const { ebookId } = request.params;
+            const updatedData = request.body;
+            console.log(ebookId);
+            const result = await ebookCollection.updateOne(
+                { _id: new ObjectId(ebookId) },
+                { $set: updatedData }
+            );
+            response.json(result);
+        });
+
+        // Find all ebooks for a specific writer
+        app.get('/writer-ebooks/:writerId', async (request, response) => {
+            const { writerId } = request.params;
+            const result = await ebookCollection.find({
+                writerId
+            }).toArray();
+            response.send(result);
+        });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
