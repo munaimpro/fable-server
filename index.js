@@ -32,6 +32,7 @@ async function run() {
         const bookmarkCollection = db.collection('bookmarks');
         const purchaseCollection = db.collection('purchases');
         const userCollection = db.collection('user');
+        const transactionCollection = db.collection('transactions');
 
 
         const JWKS = createRemoteJWKSet(
@@ -484,6 +485,12 @@ async function run() {
         // Find all ebooks for admin dashboard
         app.get('/allebooks', async(request, response) => {
             const result = await ebookCollection.find().toArray();
+            response.json(result);
+        })
+
+        // Find all transactions
+        app.get('/transactions', async (request, response) => {
+            const result = await transactionCollection.find().toArray();
             response.json(result);
         })
 
