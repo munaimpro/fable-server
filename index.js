@@ -356,6 +356,17 @@ async function run() {
             response.send(result);
         });
 
+        // Update single ebook
+        app.put('/ebook/:ebookId', async (request, response) => {
+            const { ebookId } = request.params;
+            const updatedData = request.body;
+            const result = await ebookCollection.updateOne(
+                { _id: new ObjectId(ebookId) },
+                { $set: updatedData }
+            );
+            response.json(result);
+        });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
