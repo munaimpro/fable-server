@@ -138,6 +138,7 @@ async function run() {
         //     res.send(result);
         // });
 
+        // Find published ebooks for frontend show
         app.get('/ebooks', async (request, response) => {
             try {
                 const {
@@ -480,6 +481,11 @@ async function run() {
             }
         });
 
+        // Find all ebooks for admin dashboard
+        app.get('/allebooks', async(request, response) => {
+            const result = await ebookCollection.find().toArray();
+            response.json(result);
+        })
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
