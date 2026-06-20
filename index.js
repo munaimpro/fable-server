@@ -30,6 +30,9 @@ async function run() {
         const db = client.db('fable');
         const ebookCollection = db.collection('ebooks');
         const bookmarkCollection = db.collection('bookmarks');
+        const purchaseCollection = db.collection('purchases');
+        const userCollection = db.collection('user');
+
 
         const JWKS = createRemoteJWKSet(
             new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
@@ -366,6 +369,117 @@ async function run() {
             );
             response.json(result);
         });
+
+        // Insert single book
+        app.post('/ebook', async (request, response) => {
+            const ebookData = request.body;
+            const finalEbookData = {
+                ...ebookData,
+                createdAt: new Date()
+            };
+            const result = await ebookCollection.insertOne(finalEbookData);
+            response.json(result);
+        });
+
+        // Delete single book
+        app.delete('/ebook/:ebookId', async (request, response) => {
+            const { ebookId } = request.params;
+            console.log(ebookId);
+            const result = await ebookCollection.deleteOne({ _id: new ObjectId(ebookId) });
+            response.json(result);
+        })
+
+        // Find all sales history for a specific writer
+        app.get('/purchases/:writerId', async (request, response) => {
+            const { writerId } = request.params;
+            const result = await purchaseCollection.find({
+                writerId
+            }).toArray();
+            response.send(result);
+        });
+
+        // Find all users
+        app.get('/users', async (request, response) => {
+            const result = await userCollection.find().toArray();
+            response.json(result);
+        });
+
+        // Update user role
+        app.put('/users', async (request, response) => {
+            try {
+                const { userId, role } = request.body;
+
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    {
+                        $set: {
+                            role
+                        }
+                    }
+                );
+
+                response.json(result);
+
+            } catch (error) {
+                console.error(error);
+                response.status(500).json({
+                    message: 'Failed to update role'
+                });
+            }
+        });
+
+        // Delete single user
+        app.delete('/user/:userId', async (request, response) => {
+            try {
+                const { userId } = request.params;
+
+                // Find user
+                const user = await userCollection.findOne({
+                    _id: new ObjectId(userId)
+                });
+
+                if (!user) {
+                    return response.status(404).json({
+                        message: 'User not found'
+                    });
+                }
+
+                // Delete all bookmarks of this user
+                await bookmarkCollection.deleteMany({
+                    userId
+                });
+
+                // If writer, delete all ebooks
+                if (user.role === 'writer') {
+                    await ebookCollection.deleteMany({
+                        writerId: userId
+                    });
+                }
+
+                // Delete purchase history
+                await purchaseCollection.deleteMany({
+                    buyerId: userId
+                });
+
+                // Delete user account
+                const result = await userCollection.deleteOne({
+                    _id: new ObjectId(userId)
+                });
+
+                response.json({
+                    success: true,
+                    deletedUser: result.deletedCount,
+                    message: 'User and related data deleted successfully'
+                });
+
+            } catch (error) {
+                console.error(error);
+                response.status(500).json({
+                    message: 'Failed to delete user'
+                });
+            }
+        });
+
 
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
