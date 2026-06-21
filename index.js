@@ -140,15 +140,113 @@ async function run() {
         // });
 
         // Find published ebooks for frontend show
+        // app.get('/ebooks', async (request, response) => {
+        //     try {
+        //         const {
+        //             search = '',
+        //             genre = 'All',
+        //             availability = 'all',
+        //             minPrice = 0,
+        //             maxPrice = 999999,
+        //             sortBy = 'newest',
+        //             page = 1,
+        //             limit = 8
+        //         } = request.query;
+
+        //         const currentPage = parseInt(page);
+        //         const perPage = parseInt(limit);
+
+        //         const query = {
+        //             status: 'published'
+        //         };
+
+        //         // Search by title or writer name
+        //         if (search.trim()) {
+        //             query.$or = [
+        //                 {
+        //                     title: {
+        //                         $regex: search,
+        //                         $options: 'i'
+        //                     }
+        //                 },
+        //                 {
+        //                     writerName: {
+        //                         $regex: search,
+        //                         $options: 'i'
+        //                     }
+        //                 }
+        //             ];
+        //         }
+
+        //         // Genre Filter
+        //         if (genre !== 'All') {
+        //             query.genre = genre;
+        //         }
+
+        //         // Availability Filter
+        //         if (availability !== 'all') {
+        //             query.status = availability;
+        //         }
+
+        //         // Price Filter
+        //         query.price = {
+        //             $gte: Number(minPrice),
+        //             $lte: Number(maxPrice)
+        //         };
+
+        //         // Sorting
+        //         let sortOption = {};
+
+        //         switch (sortBy) {
+        //             case 'price-asc':
+        //                 sortOption = { price: 1 };
+        //                 break;
+
+        //             case 'price-desc':
+        //                 sortOption = { price: -1 };
+        //                 break;
+
+        //             case 'newest':
+        //             default:
+        //                 sortOption = { createdAt: -1 };
+        //                 break;
+        //         }
+
+        //         const total = await ebookCollection.countDocuments(query);
+
+        //         const ebooks = await ebookCollection
+        //             .find(query)
+        //             .sort(sortOption)
+        //             .skip((currentPage - 1) * perPage)
+        //             .limit(perPage)
+        //             .toArray();
+
+        //         response.status(200).json({
+        //             ebooks,
+        //             total,
+        //             totalPages: Math.ceil(total / perPage),
+        //             currentPage
+        //         });
+
+        //     } catch (error) {
+        //         console.error(error);
+
+        //         response.status(500).json({
+        //             message: 'Failed to fetch ebooks'
+        //         });
+        //     }
+        // });
+
+        // Find published ebooks for frontend show
         app.get('/ebooks', async (request, response) => {
             try {
                 const {
-                    search = '',
-                    genre = 'All',
-                    availability = 'all',
-                    minPrice = 0,
-                    maxPrice = 999999,
-                    sortBy = 'newest',
+                    search,
+                    genre,
+                    availability,
+                    minPrice,
+                    maxPrice,
+                    sortBy,
                     page = 1,
                     limit = 8
                 } = request.query;
@@ -156,12 +254,13 @@ async function run() {
                 const currentPage = parseInt(page);
                 const perPage = parseInt(limit);
 
+                // Default query
                 const query = {
                     status: 'published'
                 };
 
                 // Search by title or writer name
-                if (search.trim()) {
+                if (search?.trim()) {
                     query.$or = [
                         {
                             title: {
@@ -179,37 +278,58 @@ async function run() {
                 }
 
                 // Genre Filter
-                if (genre !== 'All') {
+                if (genre && genre !== 'All') {
                     query.genre = genre;
                 }
 
                 // Availability Filter
-                if (availability !== 'all') {
-                    query.status = availability;
+                // Example:
+                // availability = available | sold
+                if (availability && availability !== 'all') {
+                    query.availability = availability;
                 }
 
                 // Price Filter
-                query.price = {
-                    $gte: Number(minPrice),
-                    $lte: Number(maxPrice)
-                };
+                if (minPrice || maxPrice) {
+                    query.price = {};
+
+                    if (minPrice) {
+                        query.price.$gte = Number(minPrice);
+                    }
+
+                    if (maxPrice) {
+                        query.price.$lte = Number(maxPrice);
+                    }
+                }
 
                 // Sorting
-                let sortOption = {};
+                let sortOption = {
+                    createdAt: -1
+                };
 
                 switch (sortBy) {
                     case 'price-asc':
-                        sortOption = { price: 1 };
+                        sortOption = {
+                            price: 1
+                        };
                         break;
 
                     case 'price-desc':
-                        sortOption = { price: -1 };
+                        sortOption = {
+                            price: -1
+                        };
                         break;
 
                     case 'newest':
-                    default:
-                        sortOption = { createdAt: -1 };
+                        sortOption = {
+                            createdAt: -1
+                        };
                         break;
+
+                    default:
+                        sortOption = {
+                            createdAt: -1
+                        };
                 }
 
                 const total = await ebookCollection.countDocuments(query);
@@ -225,13 +345,22 @@ async function run() {
                     ebooks,
                     total,
                     totalPages: Math.ceil(total / perPage),
-                    currentPage
+                    currentPage,
+                    appliedFilters: {
+                        search,
+                        genre,
+                        availability,
+                        minPrice,
+                        maxPrice,
+                        sortBy
+                    }
                 });
 
             } catch (error) {
                 console.error(error);
 
                 response.status(500).json({
+                    success: false,
                     message: 'Failed to fetch ebooks'
                 });
             }
