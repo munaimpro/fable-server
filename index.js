@@ -494,6 +494,182 @@ async function run() {
             response.json(result);
         })
 
+        // Find dashboard analytics (admin dashboard)
+        app.get('/analytics', async (request, response) => {
+            try {
+
+                // Metrix
+                const totalUsers = await userCollection.countDocuments();
+
+                const totalWriters = await userCollection.countDocuments({
+                    role: 'writer'
+                });
+
+                const purchases = await purchaseCollection.find({
+                    paymentStatus: 'paid'
+                }).toArray();
+
+                const totalEbooksSold = purchases.length;
+
+                const totalRevenue = purchases.reduce(
+                    (sum, purchase) => sum + Number(purchase.amount || 0),
+                    0
+                );
+
+                // Genre
+                const ALL_GENRES = [
+                    'Mystery',
+                    'Sci-Fi',
+                    'Romance',
+                    'Fantasy',
+                    'Horror',
+                    'Fiction'
+                ];
+
+                const genreStats = await ebookCollection.aggregate([
+                    {
+                        $match: {
+                            status: 'published'
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$genre',
+                            count: {
+                                $sum: 1
+                            }
+                        }
+                    }
+                ]).toArray();
+
+                const genreMap = {};
+
+                genreStats.forEach(item => {
+                    genreMap[item._id] = item.count;
+                });
+
+                const genreData = ALL_GENRES.map(genre => ({
+                    genre,
+                    count: genreMap[genre] || 0
+                }));
+
+                // Last 7 months salse
+                const now = new Date();
+
+                const startDate = new Date(
+                    now.getFullYear(),
+                    now.getMonth() - 6,
+                    1
+                );
+
+                const monthlySalesRaw = await purchaseCollection.aggregate([
+                    {
+                        $match: {
+                            paymentStatus: 'paid'
+                        }
+                    },
+                    {
+                        $addFields: {
+                            purchaseDateObj: {
+                                $dateFromString: {
+                                    dateString: '$purchaseDate'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $match: {
+                            purchaseDateObj: {
+                                $gte: startDate
+                            }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: {
+                                year: {
+                                    $year: '$purchaseDateObj'
+                                },
+                                month: {
+                                    $month: '$purchaseDateObj'
+                                }
+                            },
+                            revenue: {
+                                $sum: '$amount'
+                            }
+                        }
+                    },
+                    {
+                        $sort: {
+                            '_id.year': 1,
+                            '_id.month': 1
+                        }
+                    }
+                ]).toArray();
+
+                const monthNames = [
+                    'Jan',
+                    'Feb',
+                    'Mar',
+                    'Apr',
+                    'May',
+                    'Jun',
+                    'Jul',
+                    'Aug',
+                    'Sep',
+                    'Oct',
+                    'Nov',
+                    'Dec'
+                ];
+
+                const monthlySales = [];
+
+                for (let i = 6; i >= 0; i--) {
+
+                    const date = new Date(
+                        now.getFullYear(),
+                        now.getMonth() - i,
+                        1
+                    );
+
+                    const year = date.getFullYear();
+                    const month = date.getMonth() + 1;
+
+                    const found = monthlySalesRaw.find(
+                        item =>
+                            item._id.year === year &&
+                            item._id.month === month
+                    );
+
+                    monthlySales.push({
+                        month: monthNames[month - 1],
+                        revenue: found ? found.revenue : 0
+                    });
+                }
+
+                // Send response
+                response.json({
+                    metrics: {
+                        totalUsers,
+                        totalWriters,
+                        totalEbooksSold,
+                        totalRevenue
+                    },
+                    genreData,
+                    monthlySales
+                });
+
+            } catch (error) {
+
+                console.error(error);
+
+                response.status(500).json({
+                    message: 'Failed to load analytics'
+                });
+
+            }
+        });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
