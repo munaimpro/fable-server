@@ -917,6 +917,46 @@ async function run() {
             response.send(result);
         });
 
+        // Find single book purchase and check for a user
+        app.get('/purchase-check', async (request, response) => {
+            try {
+                console.log("PURCHASE CHECK API HIT");
+
+                const { ebookId, buyerId } = request.query;
+
+                console.log('ebookId:', ebookId);
+                console.log('buyerId:', buyerId);
+
+                if (!ebookId || !buyerId) {
+                    return response.status(400).json({
+                        success: false,
+                        message: 'ebookId and buyerId are required'
+                    });
+                }
+
+                const purchase = await purchaseCollection.findOne({
+                    ebookId,
+                    buyerId,
+                    // paymentStatus: 'paid'
+                });
+
+                console.log('purchase:', purchase);
+
+                response.status(200).json({
+                    success: true,
+                    purchased: !!purchase
+                });
+
+            } catch (error) {
+                console.error(error);
+
+                response.status(500).json({
+                    success: false,
+                    message: 'Failed to check purchase history'
+                });
+            }
+        });
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
