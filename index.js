@@ -80,7 +80,7 @@ async function run() {
                     $group: {
                         _id: "$writerId",
                         totalSoldCopies: {
-                            $sum: "$totalSales"
+                            $sum: "$totalSale"
                         },
                         genres: {
                             $addToSet: "$genre"
@@ -282,11 +282,13 @@ async function run() {
                     query.genre = genre;
                 }
 
-                // Availability Filter
-                // Example:
-                // availability = available | sold
-                if (availability && availability !== 'all') {
-                    query.availability = availability;
+                // Availability Filter using totalSale
+                if (availability === 'sold') {
+                    query.totalSale = { $gt: 0 };
+                }
+
+                if (availability === 'available') {
+                    query.totalSale = 0;
                 }
 
                 // Price Filter
@@ -307,29 +309,45 @@ async function run() {
                     createdAt: -1
                 };
 
-                switch (sortBy) {
-                    case 'price-asc':
-                        sortOption = {
-                            price: 1
-                        };
-                        break;
+                // Sold books => highest sold first
+                if (availability === 'sold') {
+                    sortOption = {
+                        totalSale: -1,
+                        createdAt: -1
+                    };
+                }
+                // Available books => newest first
+                else if (availability === 'available') {
+                    sortOption = {
+                        createdAt: -1
+                    };
+                }
+                // Normal sorting
+                else {
+                    switch (sortBy) {
+                        case 'price-asc':
+                            sortOption = {
+                                price: 1
+                            };
+                            break;
 
-                    case 'price-desc':
-                        sortOption = {
-                            price: -1
-                        };
-                        break;
+                        case 'price-desc':
+                            sortOption = {
+                                price: -1
+                            };
+                            break;
 
-                    case 'newest':
-                        sortOption = {
-                            createdAt: -1
-                        };
-                        break;
+                        case 'newest':
+                            sortOption = {
+                                createdAt: -1
+                            };
+                            break;
 
-                    default:
-                        sortOption = {
-                            createdAt: -1
-                        };
+                        default:
+                            sortOption = {
+                                createdAt: -1
+                            };
+                    }
                 }
 
                 const total = await ebookCollection.countDocuments(query);
@@ -691,24 +709,56 @@ async function run() {
                     1
                 );
 
+                // const monthlySalesRaw = await purchaseCollection.aggregate([
+                //     {
+                //         $match: {
+                //             paymentStatus: 'paid'
+                //         }
+                //     },
+                //     {
+                //         $addFields: {
+                //             purchaseDateObj: {
+                //                 $dateFromString: {
+                //                     dateString: '$purchaseDate'
+                //                 }
+                //             }
+                //         }
+                //     },
+                //     {
+                //         $match: {
+                //             purchaseDateObj: {
+                //                 $gte: startDate
+                //             }
+                //         }
+                //     },
+                //     {
+                //         $group: {
+                //             _id: {
+                //                 year: {
+                //                     $year: '$purchaseDateObj'
+                //                 },
+                //                 month: {
+                //                     $month: '$purchaseDateObj'
+                //                 }
+                //             },
+                //             revenue: {
+                //                 $sum: '$amount'
+                //             }
+                //         }
+                //     },
+                //     {
+                //         $sort: {
+                //             '_id.year': 1,
+                //             '_id.month': 1
+                //         }
+                //     }
+                // ]).toArray();
+
                 const monthlySalesRaw = await purchaseCollection.aggregate([
                     {
                         $match: {
-                            paymentStatus: 'paid'
-                        }
-                    },
-                    {
-                        $addFields: {
-                            purchaseDateObj: {
-                                $dateFromString: {
-                                    dateString: '$purchaseDate'
-                                }
-                            }
-                        }
-                    },
-                    {
-                        $match: {
-                            purchaseDateObj: {
+                            paymentStatus: 'paid',
+                            purchaseDate: {
                                 $gte: startDate
                             }
                         }
@@ -717,14 +767,14 @@ async function run() {
                         $group: {
                             _id: {
                                 year: {
-                                    $year: '$purchaseDateObj'
+                                    $year: '$purchaseDate'
                                 },
                                 month: {
-                                    $month: '$purchaseDateObj'
+                                    $month: '$purchaseDate'
                                 }
                             },
                             revenue: {
-                                $sum: '$amount'
+                                $sum: '$price'
                             }
                         }
                     },
@@ -797,6 +847,74 @@ async function run() {
                 });
 
             }
+        });
+        
+        // Insert single purchase
+        app.post('/purchase', async (request, response) => {
+            const { ebookId, ebookTitle, buyerId, buyerName, writerId, paymentStatus, transactionId, price, type, userEmail, amount, status, coverImage, writerName } = request.body;
+
+            const purchaseData = {
+                ebookId,
+                ebookTitle,
+                buyerId,
+                buyerName,
+                writerId,
+                writerName,
+                coverImage,
+                paymentStatus,
+                transactionId,
+                price,
+                purchaseDate: new Date()
+            };
+
+            const transactionData = {
+                transactionId,
+                type,
+                userEmail,
+                amount,
+                status,
+                createdAt: new Date()
+            }
+
+            const isPurchaseExist = await purchaseCollection.findOne({
+                ebookId,
+                buyerId
+            });
+
+            if (isPurchaseExist) {
+                return response.send({
+                    success: false,
+                    message: "Already Purchased"
+                });
+            }
+
+            const purchaseResponse = await purchaseCollection.insertOne(purchaseData);
+
+            await ebookCollection.updateOne(
+                { _id: new ObjectId(ebookId) },
+                {
+                    $inc: {
+                        totalSale: 1
+                    }
+                }
+            );
+
+            const transactionResponse = await transactionCollection.insertOne(transactionData);
+
+            return response.send({
+                success: true,
+                purchaseInsertedId: purchaseResponse.insertedId,
+                transactionInsertedId: transactionResponse.insertedId
+            });
+        });
+
+        // Find all purchase history for a specific user
+        app.get('/purchase-history/:buyerId', async (request, response) => {
+            const { buyerId } = request.params;
+            const result = await purchaseCollection.find({
+                buyerId
+            }).toArray();
+            response.send(result);
         });
 
         // Send a ping to confirm a successful connection
