@@ -33,6 +33,7 @@ async function run() {
         const purchaseCollection = db.collection('purchases');
         const userCollection = db.collection('user');
         const transactionCollection = db.collection('transactions');
+        const verifiedWriterCollection = db.collection('verified-writers');
 
 
         const JWKS = createRemoteJWKSet(
@@ -955,6 +956,13 @@ async function run() {
                     message: 'Failed to check purchase history'
                 });
             }
+        });
+
+        // Insert verified writer
+        app.post('/purchase', async (request, response) => {
+            const writerData = request.body;
+            const result = await verifiedWriterCollection.insertOne(writerData);
+            response.json(result);
         });
 
         // Send a ping to confirm a successful connection
