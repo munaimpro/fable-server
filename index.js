@@ -959,10 +959,65 @@ async function run() {
         });
 
         // Insert verified writer
-        app.post('/purchase', async (request, response) => {
-            const writerData = request.body;
-            const result = await verifiedWriterCollection.insertOne(writerData);
+        app.post('/verified-writers', async (request, response) => {
+            const { writerId, paymentStatus, transactionId, type, writerEmail, status, verificationDate } = request.body;
+
+            const writerVerificationData = {
+                writerId,
+                paymentStatus,
+                transactionId,
+                type,
+                writerEmail,
+                status,
+                verificationDate
+            };
+
+            const isWriterExist = await verifiedWriterCollection.findOne({
+                writerId
+            });
+
+            if (isWriterExist) {
+                return response.send({
+                    success: false,
+                    message: "Already Verified"
+                });
+            }
+
+            const result = await verifiedWriterCollection.insertOne(writerVerificationData);
             response.json(result);
+        });
+
+        // Check writer verification 
+        app.get('/verified-writers/:writerId', async (request, response) => {
+            try {
+                const { writerId } = request.params;
+
+                const verifiedWriter = await verifiedWriterCollection.findOne({
+                    writerId
+                });
+
+                if (!verifiedWriter) {
+                    return response.status(404).json({
+                        success: false,
+                        verified: false,
+                        message: 'Writer is not verified'
+                    });
+                }
+
+                return response.status(200).json({
+                    success: true,
+                    verified: true,
+                    data: verifiedWriter
+                });
+
+            } catch (error) {
+                console.error(error);
+
+                return response.status(500).json({
+                    success: false,
+                    message: 'Internal Server Error'
+                });
+            }
         });
 
         // Send a ping to confirm a successful connection
