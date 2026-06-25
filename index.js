@@ -767,7 +767,7 @@ async function run() {
 
                     monthlySales.push({
                         month: monthNames[month - 1],
-                        revenue: found ? found.revenue : 0
+                        revenue: found ? found.revenue.toFixed(2) : 0
                     });
                 }
 
