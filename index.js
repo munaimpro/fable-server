@@ -70,69 +70,101 @@ async function run() {
 
         // Find top writers for homepage
         app.get('/top-writers', async (request, response) => {
-            const result = await ebookCollection.aggregate([
-                {
-                    $match: {
-                        status: "published"
-                    }
-                },
+            try {
+                let result = await ebookCollection.aggregate([
+                    {
+                        $match: {
+                            status: "published"
+                        }
+                    },
 
-                {
-                    $group: {
-                        _id: "$writerId",
-                        totalSoldCopies: {
-                            $sum: "$totalSale"
-                        },
-                        genres: {
-                            $addToSet: "$genre"
+                    {
+                        $group: {
+                            _id: "$writerId",
+                            totalSoldCopies: {
+                                $sum: "$totalSale"
+                            },
+                            genres: {
+                                $addToSet: "$genre"
+                            }
+                        }
+                    },
+
+                    {
+                        $sort: {
+                            totalSoldCopies: -1
+                        }
+                    },
+
+                    {
+                        $limit: 3
+                    },
+
+                    {
+                        $addFields: {
+                            writerObjectId: {
+                                $toObjectId: "$_id"
+                            }
+                        }
+                    },
+
+                    {
+                        $lookup: {
+                            from: "user",
+                            localField: "writerObjectId",
+                            foreignField: "_id",
+                            as: "writer"
+                        }
+                    },
+
+                    {
+                        $unwind: "$writer"
+                    },
+
+                    {
+                        $project: {
+                            _id: 0,
+                            writerId: "$writer._id",
+                            name: "$writer.name",
+                            image: "$writer.image",
+                            genres: 1,
+                            totalSoldCopies: 1
                         }
                     }
-                },
+                ]).toArray();
 
-                {
-                    $sort: {
-                        totalSoldCopies: -1
-                    }
-                },
+                // Fallback: no published ebooks found
+                if (result.length === 0) {
+                    const fallbackWriters = await userCollection
+                        .find({
+                            role: "writer"
+                        })
+                        .limit(3)
+                        .project({
+                            name: 1,
+                            image: 1
+                        })
+                        .toArray();
 
-                {
-                    $limit: 3
-                },
-
-                {
-                    $addFields: {
-                        writerObjectId: {
-                            $toObjectId: "$_id"
-                        }
-                    }
-                },
-
-                {
-                    $lookup: {
-                        from: "user",
-                        localField: "writerObjectId",
-                        foreignField: "_id",
-                        as: "writer"
-                    }
-                },
-
-                {
-                    $unwind: "$writer"
-                },
-
-                {
-                    $project: {
-                        _id: 0,
-                        writerId: "$writer._id",
-                        name: "$writer.name",
-                        image: "$writer.image",
-                        genres: 1,
-                        totalSoldCopies: 1
-                    }
+                    result = fallbackWriters.map(writer => ({
+                        writerId: writer._id,
+                        name: writer.name,
+                        image: writer.image,
+                        genres: [],
+                        totalSoldCopies: 0
+                    }));
                 }
-            ]).toArray();
 
-            response.json(result);
+                response.json(result);
+
+            } catch (error) {
+                console.error(error);
+
+                response.status(500).json({
+                    success: false,
+                    message: "Failed to load top writers"
+                });
+            }
         });
 
         // app.get('/debug-writers', async (req, res) => {
