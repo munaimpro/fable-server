@@ -649,7 +649,7 @@ async function run() {
                 const totalEbooksSold = purchases.length;
 
                 const totalRevenue = purchases.reduce(
-                    (sum, purchase) => sum + Number(purchase.amount || 0),
+                    (sum, purchase) => sum + Number(purchase.price || 0),
                     0
                 );
 
@@ -698,51 +698,6 @@ async function run() {
                     now.getMonth() - 6,
                     1
                 );
-
-                // const monthlySalesRaw = await purchaseCollection.aggregate([
-                //     {
-                //         $match: {
-                //             paymentStatus: 'paid'
-                //         }
-                //     },
-                //     {
-                //         $addFields: {
-                //             purchaseDateObj: {
-                //                 $dateFromString: {
-                //                     dateString: '$purchaseDate'
-                //                 }
-                //             }
-                //         }
-                //     },
-                //     {
-                //         $match: {
-                //             purchaseDateObj: {
-                //                 $gte: startDate
-                //             }
-                //         }
-                //     },
-                //     {
-                //         $group: {
-                //             _id: {
-                //                 year: {
-                //                     $year: '$purchaseDateObj'
-                //                 },
-                //                 month: {
-                //                     $month: '$purchaseDateObj'
-                //                 }
-                //             },
-                //             revenue: {
-                //                 $sum: '$amount'
-                //             }
-                //         }
-                //     },
-                //     {
-                //         $sort: {
-                //             '_id.year': 1,
-                //             '_id.month': 1
-                //         }
-                //     }
-                // ]).toArray();
 
                 const monthlySalesRaw = await purchaseCollection.aggregate([
                     {
