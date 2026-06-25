@@ -64,9 +64,28 @@ async function run() {
 
         // Find featured ebooks for homepage
         app.get('/featured-ebooks', async (request, response) => {
-            const result = await ebookCollection.find().limit(6).toArray();
-            response.json(result);
-        });
+            try {
+                const result = await ebookCollection
+                    .find({
+                        status: "published"
+                    })
+                    .sort({
+                        createdAt: -1
+                    }) // newest first (optional)
+                    .limit(6)
+                    .toArray();
+
+                response.json(result);
+
+            } catch (error) {
+                console.error(error);
+
+                response.status(500).json({
+                    success: false,
+                    message: 'Failed to fetch featured ebooks'
+                });
+            }
+        }); 
 
         // Find top writers for homepage
         app.get('/top-writers', async (request, response) => {
