@@ -448,7 +448,7 @@ async function run() {
         });
 
         // Add bookmark by a single user
-        app.post('/bookmarks', async (request, response) => {
+        app.post('/bookmarks', verifyToken, async (request, response) => {
             try {
                 const { ebookId, userId } = request.body;
 
@@ -489,7 +489,7 @@ async function run() {
         });
 
         // Update book status by writer
-        app.put('/ebook/:ebookId', async (request, response) => {
+        app.put('/ebook/:ebookId', verifyToken, async (request, response) => {
             const { ebookId } = request.params;
             const updatedData = request.body;
             console.log(ebookId);
@@ -509,19 +509,8 @@ async function run() {
             response.send(result);
         });
 
-        // Update single ebook
-        app.put('/ebook/:ebookId', async (request, response) => {
-            const { ebookId } = request.params;
-            const updatedData = request.body;
-            const result = await ebookCollection.updateOne(
-                { _id: new ObjectId(ebookId) },
-                { $set: updatedData }
-            );
-            response.json(result);
-        });
-
         // Insert single book
-        app.post('/ebook', async (request, response) => {
+        app.post('/ebook', verifyToken, async (request, response) => {
             const ebookData = request.body;
             const finalEbookData = {
                 ...ebookData,
@@ -555,7 +544,7 @@ async function run() {
         });
 
         // Update user role
-        app.put('/users', async (request, response) => {
+        app.put('/users', verifyToken, async (request, response) => {
             try {
                 const { userId, role } = request.body;
 
@@ -579,7 +568,7 @@ async function run() {
         });
 
         // Delete single user
-        app.delete('/user/:userId', async (request, response) => {
+        app.delete('/user/:userId', verifyToken, async (request, response) => {
             try {
                 const { userId } = request.params;
 
